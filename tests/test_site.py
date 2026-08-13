@@ -29,7 +29,14 @@ for required in (
 ):
     assert required in html, f"missing visual text: {required}"
 
-assert html.count('<canvas') >= 6, "six visual panels must have canvas elements"
+# The six panels are generated at runtime by the modes[] template. The source
+# therefore intentionally contains one canvas template, not six literal tags.
+assert html.count("<canvas>") == 1, "canvas template must be present exactly once"
+assert "const modes=[[\"surface\"" in html
+assert html.count('data-mode="${m[0]}"') == 1
+assert "document.write(modes.map" in html
+assert html.count('],["') >= 5, "six visual modes must be defined"
+
 assert "requestAnimationFrame" in html
 assert "prefers-reduced-motion" in html
 assert "pointerdown" in html and "onwheel" in html
