@@ -18,7 +18,10 @@ config = Path(sys.argv[3]).resolve()
 if not archive.is_file():
     raise SystemExit("ERROR: backup archive not found")
 
-with tempfile.TemporaryDirectory(prefix="restore-", dir=root) as tmp_name:
+# Extract outside DATA_DIR so the temporary extraction tree can never be
+# confused with the destination state and so a restore cannot accidentally
+# consume its own temporary files.
+with tempfile.TemporaryDirectory(prefix="restore-state-") as tmp_name:
     tmp = Path(tmp_name)
     with tarfile.open(archive, "r:gz") as tar:
         members = tar.getmembers()
@@ -26,6 +29,8 @@ with tempfile.TemporaryDirectory(prefix="restore-", dir=root) as tmp_name:
         if "manifest.json" not in names:
             raise SystemExit("ERROR: backup manifest missing")
         for member in members:
+            if member.issym() or member.islnk():
+                raise SystemExit("ERROR: links are not allowed in backup")
             target = (tmp / member.name).resolve()
             if not str(target).startswith(str(tmp) + os.sep):
                 raise SystemExit("ERROR: unsafe backup path")
@@ -33,6 +38,9 @@ with tempfile.TemporaryDirectory(prefix="restore-", dir=root) as tmp_name:
 
     manifest = json.loads((tmp / "manifest.json").read_text())
     state_dir = tmp / "state"
+    if not state_dir.is_dir():
+        raise SystemExit("ERROR: backup state directory missing")
+
     for name, meta in manifest["files"].items():
         source = tmp / name
         if not source.is_file():
@@ -42,9 +50,12 @@ with tempfile.TemporaryDirectory(prefix="restore-", dir=root) as tmp_name:
             raise SystemExit(f"ERROR: checksum mismatch: {name}")
 
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
-    for source in sorted(state_dir.iterdir()):
+    config.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+
+    restored_targets = []
+    for name in manifest["files"]:
+        source = tmp / name
         if source.name == "config.json":
-            config.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
             target = config
         else:
             target = root / source.name
@@ -52,5 +63,9 @@ with tempfile.TemporaryDirectory(prefix="restore-", dir=root) as tmp_name:
         shutil.copyfile(source, tmp_target)
         os.chmod(tmp_target, 0o600)
         os.replace(tmp_target, target)
+        restored_targets.append(target)
+
+    if not restored_targets:
+        raise SystemExit("ERROR: backup contains no restorable state")
 
 print(f"state restore verified and applied: {archive.name}")
