@@ -53,4 +53,22 @@ with tempfile.TemporaryDirectory() as tmp:
     assert "tcp.example.test:443" in decoded
     assert not list(data.glob("*.tmp"))
 
-print("generate.py smoke test: PASS")
+    token_file = data / "subscription_token.txt"
+    token_file.write_text("old-token\n")
+    subprocess.run(["python3", str(ROOT / "scripts" / "backup_state.py"), str(data), str(config)], env=env, check=True)
+    backups = list((data / "backups").glob("state-*.tar.gz"))
+    assert len(backups) == 1
+    assert backups[0].stat().st_size > 0
+
+    rotated = subprocess.run(
+        ["python3", str(ROOT / "scripts" / "rotate_subscription_token.py"), str(data)],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "subscription token rotated" in rotated.stdout
+    assert token_file.read_text().strip() != "old-token"
+    assert "/sub/" in (data / "subscription_url.txt").read_text()
+
+print("runtime state smoke test: PASS")
