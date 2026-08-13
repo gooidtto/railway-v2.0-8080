@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 html = (Path(__file__).resolve().parents[1] / "site" / "index.html").read_text(encoding="utf-8")
 low = html.lower()
@@ -14,9 +15,14 @@ assert "螺旋模式" in html
 assert "网格模式" in html
 assert "粒子模式" in html
 assert "波浪模式" in html
+assert "Three.js R160" in html
+assert "WebGL 渲染" in html
+assert "three@0.160.0/build/three.module.min.js" in html
 assert "canvas" in low
-assert "https://" not in low
-assert "http://" not in low
+
+urls = re.findall(r"https?://[^'\"\\s]+", html)
+assert len(urls) == 1, f"unexpected external URLs in landing page: {urls}"
+assert urls[0] == "https://unpkg.com/three@0.160.0/build/three.module.min.js"
 
 size = len(html.encode("utf-8"))
 assert size < 120_000, f"landing page is too large: {size} bytes"
