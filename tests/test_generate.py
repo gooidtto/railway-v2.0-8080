@@ -53,9 +53,23 @@ with tempfile.TemporaryDirectory() as tmp:
     assert "tcp.example.test:443" in decoded
     assert not list(data.glob("*.tmp"))
 
-    token_file = data / "subscription_token.txt"
-    token_file.write_text("old-token\n")
-    subprocess.run(["python3", str(ROOT / "scripts" / "backup_state.py"), str(data), str(config)], env=env, check=True)
+    # Simulate the runtime state created by start.sh before backup_state.py runs.
+    state_files = {
+        "uuid.txt": "00000000-0000-4000-8000-000000000000\n",
+        "reality_private_key.txt": "private-key\n",
+        "reality_public_key.txt": "public-key\n",
+        "vless_decryption.txt": "decryption\n",
+        "vless_encryption.txt": "encryption\n",
+        "subscription_token.txt": "old-token\n",
+    }
+    for name, value in state_files.items():
+        (data / name).write_text(value)
+
+    subprocess.run(
+        ["python3", str(ROOT / "scripts" / "backup_state.py"), str(data), str(config)],
+        env=env,
+        check=True,
+    )
     backups = list((data / "backups").glob("state-*.tar.gz"))
     assert len(backups) == 1
     assert backups[0].stat().st_size > 0
@@ -80,8 +94,8 @@ with tempfile.TemporaryDirectory() as tmp:
         env=env,
         check=True,
     )
-    assert (restored / "uuid.txt").read_text().strip() == "00000000-0000-4000-8000-000000000000"
-    assert (restored / "subscription_token.txt").read_text().strip() == "old-token"
+    for name, value in state_files.items():
+        assert (restored / name).read_text() == value
     assert json.loads(restored_config.read_text()) == generated
 
 print("runtime state smoke test: PASS")
