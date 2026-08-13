@@ -68,7 +68,20 @@ with tempfile.TemporaryDirectory() as tmp:
         check=True,
     )
     assert "subscription token rotated" in rotated.stdout
+    assert "old-token" not in rotated.stdout
     assert token_file.read_text().strip() != "old-token"
     assert "/sub/" in (data / "subscription_url.txt").read_text()
+
+    restored = tmp / "restored"
+    restored_config = restored / "config.json"
+    restored.mkdir()
+    subprocess.run(
+        ["python3", str(ROOT / "scripts" / "restore_state.py"), str(restored), str(backups[0]), str(restored_config)],
+        env=env,
+        check=True,
+    )
+    assert (restored / "uuid.txt").read_text().strip() == "00000000-0000-4000-8000-000000000000"
+    assert (restored / "subscription_token.txt").read_text().strip() == "old-token"
+    assert json.loads(restored_config.read_text()) == generated
 
 print("runtime state smoke test: PASS")
