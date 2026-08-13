@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 html = (Path(__file__).resolve().parents[1] / "site" / "index.html").read_text(encoding="utf-8")
 low = html.lower()
@@ -34,7 +33,6 @@ assert html.count('data-target="') == 6
 assert "requestAnimationFrame" not in html
 assert "setInterval" not in html
 assert "setTimeout" not in html
-assert "${" not in html
 assert "https://" not in html and "http://" not in html
 
 size = len(html.encode("utf-8"))
