@@ -65,6 +65,7 @@ with tempfile.TemporaryDirectory() as tmp:
     for name, value in state_files.items():
         (data / name).write_text(value)
 
+    token_file = data / "subscription_token.txt"
     subprocess.run(
         ["python3", str(ROOT / "scripts" / "backup_state.py"), str(data), str(config)],
         env=env,
