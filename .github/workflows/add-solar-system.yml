@@ -17,7 +17,6 @@ jobs:
         with:
           ref: camouflage-v2-stable
           fetch-depth: 0
-
       - name: Inject visible solar system UI
         shell: python
         run: |
@@ -28,82 +27,13 @@ jobs:
           if marker in s:
               print('solar system already installed')
               raise SystemExit(0)
-
-          css = r'''<style id="solar-system-v3-css">
-          #solarSystemLauncher{display:inline-flex;align-items:center;justify-content:center;gap:7px;margin:14px auto 0;padding:10px 18px;border:1px solid #ff9d32;border-radius:999px;background:linear-gradient(180deg,#2b1605,#110a03);color:#ffd9a0;font-weight:800;cursor:pointer;box-shadow:0 0 18px #ff8c0030;font-size:14px}
-          #solarSystemLauncher:hover,#solarSystemLauncher.active{border-color:#ffd36a;color:#fff0c8;box-shadow:0 0 28px #ff8c0055}
-          #solarSystemV3{display:none;margin:18px 0 0;border:1px solid #493016;border-radius:16px;min-height:650px;position:relative;overflow:hidden;background:radial-gradient(circle at 50% 48%,#15100a 0,#07080d 34%,#010205 76%);box-shadow:inset 0 0 60px #000}
-          #solarSystemV3.show{display:block}
-          #solarSystemV3 .ss-title{position:absolute;left:24px;top:18px;z-index:20}.ss-title strong{font-size:22px}.ss-title small{display:block;color:#a9957e;margin-top:4px}
-          #solarSystemV3 .ss-stars{position:absolute;inset:0;background-image:radial-gradient(circle at 7% 18%,#fff 0 1px,transparent 1.6px),radial-gradient(circle at 16% 74%,#8edfff 0 1px,transparent 1.6px),radial-gradient(circle at 28% 32%,#fff 0 1px,transparent 1.6px),radial-gradient(circle at 42% 83%,#d7a7ff 0 1px,transparent 1.6px),radial-gradient(circle at 57% 15%,#fff 0 1px,transparent 1.6px),radial-gradient(circle at 71% 67%,#8edfff 0 1px,transparent 1.6px),radial-gradient(circle at 86% 24%,#fff 0 1px,transparent 1.6px),radial-gradient(circle at 94% 78%,#d7a7ff 0 1px,transparent 1.6px);opacity:.8}
-          #solarSystemV3 .ss-scene{position:absolute;inset:58px 0 0;max-width:1120px;margin:auto}
-          #solarSystemV3 .ss-sun{position:absolute;left:50%;top:50%;width:82px;height:82px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle at 32% 28%,#fffde2 0 9%,#ffe56b 18%,#ff9e22 48%,#dc430d 76%,#7c1608);box-shadow:0 0 24px #ff9e22,0 0 70px #ff8c0066,0 0 120px #ff6b0030}
-          #solarSystemV3 .ss-orbit{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:1px solid #ffffff20;border-radius:50%;aspect-ratio:1}
-          #solarSystemV3 .o1{width:120px}.o2{width:175px}.o3{width:235px}.o4{width:300px}.o5{width:390px;border-style:dashed}.o6{width:500px}.o7{width:610px}.o8{width:720px}
-          #solarSystemV3 .ss-belt{position:absolute;left:50%;top:50%;width:350px;height:350px;transform:translate(-50%,-50%);border:2px dashed #aaa4;border-radius:50%}.ss-kuiper{width:770px;height:770px;border:2px dotted #6aa1c533;border-radius:50%;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
-          #solarSystemV3 .ss-planet{position:absolute;left:50%;top:50%;border-radius:50%;box-shadow:inset -5px -5px 8px #000c,0 0 9px #fff2}
-          #solarSystemV3 .mercury{width:9px;height:9px;background:#aaa;transform:translate(-50%,-50%) translate(-3px,-60px)}
-          #solarSystemV3 .venus{width:15px;height:15px;background:#d9b46d;transform:translate(-50%,-50%) translate(88px,-32px)}
-          #solarSystemV3 .earth{width:18px;height:18px;background:linear-gradient(135deg,#6ed5ee,#1b5ca0 60%,#102848);transform:translate(-50%,-50%) translate(78px,105px)}
-          #solarSystemV3 .mars{width:13px;height:13px;background:#c9532a;transform:translate(-50%,-50%) translate(-145px,112px)}
-          #solarSystemV3 .jupiter{width:42px;height:42px;background:repeating-linear-gradient(0deg,#a96c48 0 6px,#ead0ae 6px 12px,#8f5941 12px 18px);transform:translate(-50%,-50%) translate(-190px,-108px)}
-          #solarSystemV3 .saturn{width:36px;height:36px;background:#d8bd78;transform:translate(-50%,-50%) translate(222px,137px)}
-          #solarSystemV3 .saturn:after{content:"";position:absolute;left:50%;top:50%;width:76px;height:25px;transform:translate(-50%,-50%) rotate(15deg);border:5px solid #d9bd7888;border-radius:50%}
-          #solarSystemV3 .uranus{width:24px;height:24px;background:#79c8db;transform:translate(-50%,-50%) translate(-88px,255px)}
-          #solarSystemV3 .neptune{width:23px;height:23px;background:#3864bd;transform:translate(-50%,-50%) translate(103px,-286px)}
-          #solarSystemV3 .ss-label{position:absolute;color:#b9c8ce;font-size:10px;white-space:nowrap;text-align:center}.ss-label b{display:block;color:#fff;font-size:12px}
-          #solarSystemV3 .ss-panel{position:absolute;left:18px;bottom:18px;padding:12px 14px;border:1px solid #4a3824;border-radius:10px;background:#02060ddd;color:#9eaeb5;font-size:11px;line-height:1.55}.ss-panel.right{left:auto;right:18px;text-align:right}
-          #solarSystemV3 .ss-hint{position:absolute;right:24px;top:22px;color:#a8947b;font-size:11px;text-align:right}
-          #solarSystemV3.playing .ss-sun{animation:ssPulse 2.8s ease-in-out infinite}.ss-playing .ss-orbit{animation:ssOrbit 6s ease-in-out infinite}
-          @keyframes ssPulse{50%{box-shadow:0 0 35px #ff9e22,0 0 90px #ff8c0066,0 0 145px #ff6b0038}}@keyframes ssOrbit{50%{opacity:.55;transform:translate(-50%,-50%) scale(1.012)}}
-          @media(max-width:980px){#solarSystemV3{min-height:560px}#solarSystemV3 .ss-scene{transform:scale(.82);transform-origin:top center}}@media(max-width:620px){#solarSystemV3{min-height:470px}#solarSystemV3 .ss-scene{transform:scale(.58);transform-origin:50% 0}#solarSystemV3 .ss-panel,#solarSystemV3 .ss-hint{display:none}}
-          @media(prefers-reduced-motion:reduce){#solarSystemV3 *{animation:none!important}}
-          </style>'''
-
-          html = r'''<!-- solar-system-v3 -->
-          <button id="solarSystemLauncher" type="button" aria-expanded="false">☼ 太阳系 · Solar System</button>
-          <section id="solarSystemV3" aria-label="Solar System visualization">
-            <div class="ss-title"><strong>☼ SOLAR SYSTEM</strong><small>太阳系 · Interactive Space Visualization</small></div>
-            <div class="ss-hint">点击按钮播放 · CSS-only · 无外部资源<br>Eight planets · Asteroid Belt · Kuiper Belt</div>
-            <div class="ss-stars"></div><div class="ss-scene">
-              <div class="ss-kuiper"></div><div class="ss-belt"></div>
-              <div class="ss-orbit o1"></div><div class="ss-orbit o2"></div><div class="ss-orbit o3"></div><div class="ss-orbit o4"></div><div class="ss-orbit o5"></div><div class="ss-orbit o6"></div><div class="ss-orbit o7"></div><div class="ss-orbit o8"></div>
-              <div class="ss-sun"></div>
-              <div class="ss-planet mercury"><span class="ss-label" style="left:-24px;top:-25px"><b>Mercury</b>水星</span></div>
-              <div class="ss-planet venus"><span class="ss-label" style="left:8px;top:-27px"><b>Venus</b>金星</span></div>
-              <div class="ss-planet earth"><span class="ss-label" style="left:12px;top:14px"><b>Earth</b>地球</span></div>
-              <div class="ss-planet mars"><span class="ss-label" style="left:-48px;top:8px"><b>Mars</b>火星</span></div>
-              <div class="ss-planet jupiter"><span class="ss-label" style="left:-26px;top:45px"><b>Jupiter</b>木星</span></div>
-              <div class="ss-planet saturn"><span class="ss-label" style="left:36px;top:10px"><b>Saturn</b>土星</span></div>
-              <div class="ss-planet uranus"><span class="ss-label" style="left:-90px;top:5px"><b>Uranus</b>天王星</span></div>
-              <div class="ss-planet neptune"><span class="ss-label" style="left:27px;top:7px"><b>Neptune</b>海王星</span></div>
-            </div>
-            <div class="ss-panel"><b>Relative Solar System</b><br>Sun · 8 Planets · Asteroid Belt · Kuiper Belt</div>
-            <div class="ss-panel right"><b>Orbital Period Guide</b><br>Mercury → Neptune<br>内侧快 · 外侧慢</div>
-          </section>'''
-
-          js = r'''<script id="solar-system-v3-js">
-          (()=>{
-            const launcher=document.getElementById('solarSystemLauncher');
-            const panel=document.getElementById('solarSystemV3');
-            if(!launcher||!panel)return;
-            launcher.addEventListener('click',()=>{
-              const show=!panel.classList.contains('show');
-              panel.classList.toggle('show',show);
-              launcher.classList.toggle('active',show);
-              launcher.setAttribute('aria-expanded',String(show));
-              if(show){panel.scrollIntoView({behavior:'smooth',block:'start'});}
-            });
-            panel.addEventListener('click',e=>{if(e.target.closest('.ss-scene'))panel.classList.toggle('playing');});
-          })();
-          </script>'''
-
+          css = r'''<style id="solar-system-v3-css">#solarSystemLauncher{display:inline-flex;align-items:center;justify-content:center;gap:7px;margin:14px auto 0;padding:10px 18px;border:1px solid #ff9d32;border-radius:999px;background:linear-gradient(180deg,#2b1605,#110a03);color:#ffd9a0;font-weight:800;cursor:pointer;box-shadow:0 0 18px #ff8c0030;font-size:14px}#solarSystemLauncher:hover,#solarSystemLauncher.active{border-color:#ffd36a;color:#fff0c8;box-shadow:0 0 28px #ff8c0055}#solarSystemV3{display:none;margin:18px 0 0;border:1px solid #493016;border-radius:16px;min-height:650px;position:relative;overflow:hidden;background:radial-gradient(circle at 50% 48%,#15100a 0,#07080d 34%,#010205 76%);box-shadow:inset 0 0 60px #000}#solarSystemV3.show{display:block}#solarSystemV3 .ss-title{position:absolute;left:24px;top:18px;z-index:20}.ss-title strong{font-size:22px}.ss-title small{display:block;color:#a9957e;margin-top:4px}#solarSystemV3 .ss-stars{position:absolute;inset:0;background-image:radial-gradient(circle at 7% 18%,#fff 0 1px,transparent 1.6px),radial-gradient(circle at 16% 74%,#8edfff 0 1px,transparent 1.6px),radial-gradient(circle at 28% 32%,#fff 0 1px,transparent 1.6px),radial-gradient(circle at 42% 83%,#d7a7ff 0 1px,transparent 1.6px),radial-gradient(circle at 57% 15%,#fff 0 1px,transparent 1.6px),radial-gradient(circle at 71% 67%,#8edfff 0 1px,transparent 1.6px),radial-gradient(circle at 86% 24%,#fff 0 1px,transparent 1.6px),radial-gradient(circle at 94% 78%,#d7a7ff 0 1px,transparent 1.6px);opacity:.8}#solarSystemV3 .ss-scene{position:absolute;inset:58px 0 0;max-width:1120px;margin:auto}#solarSystemV3 .ss-sun{position:absolute;left:50%;top:50%;width:82px;height:82px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle at 32% 28%,#fffde2 0 9%,#ffe56b 18%,#ff9e22 48%,#dc430d 76%,#7c1608);box-shadow:0 0 24px #ff9e22,0 0 70px #ff8c0066,0 0 120px #ff6b0030}#solarSystemV3 .ss-orbit{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:1px solid #ffffff20;border-radius:50%;aspect-ratio:1}#solarSystemV3 .o1{width:120px}#solarSystemV3 .o2{width:175px}#solarSystemV3 .o3{width:235px}#solarSystemV3 .o4{width:300px}#solarSystemV3 .o5{width:390px;border-style:dashed}#solarSystemV3 .o6{width:500px}#solarSystemV3 .o7{width:610px}#solarSystemV3 .o8{width:720px}#solarSystemV3 .ss-belt{position:absolute;left:50%;top:50%;width:350px;height:350px;transform:translate(-50%,-50%);border:2px dashed #aaa4;border-radius:50%}.ss-kuiper{width:770px;height:770px;border:2px dotted #6aa1c533;border-radius:50%;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}#solarSystemV3 .ss-planet{position:absolute;left:50%;top:50%;border-radius:50%;box-shadow:inset -5px -5px 8px #000c,0 0 9px #fff2}#solarSystemV3 .mercury{width:9px;height:9px;background:#aaa;transform:translate(-50%,-50%) translate(-3px,-60px)}#solarSystemV3 .venus{width:15px;height:15px;background:#d9b46d;transform:translate(-50%,-50%) translate(88px,-32px)}#solarSystemV3 .earth{width:18px;height:18px;background:linear-gradient(135deg,#6ed5ee,#1b5ca0 60%,#102848);transform:translate(-50%,-50%) translate(78px,105px)}#solarSystemV3 .mars{width:13px;height:13px;background:#c9532a;transform:translate(-50%,-50%) translate(-145px,112px)}#solarSystemV3 .jupiter{width:42px;height:42px;background:repeating-linear-gradient(0deg,#a96c48 0 6px,#ead0ae 6px 12px,#8f5941 12px 18px);transform:translate(-50%,-50%) translate(-190px,-108px)}#solarSystemV3 .saturn{width:36px;height:36px;background:#d8bd78;transform:translate(-50%,-50%) translate(222px,137px)}#solarSystemV3 .saturn:after{content:"";position:absolute;left:50%;top:50%;width:76px;height:25px;transform:translate(-50%,-50%) rotate(15deg);border:5px solid #d9bd7888;border-radius:50%}#solarSystemV3 .uranus{width:24px;height:24px;background:#79c8db;transform:translate(-50%,-50%) translate(-88px,255px)}#solarSystemV3 .neptune{width:23px;height:23px;background:#3864bd;transform:translate(-50%,-50%) translate(103px,-286px)}#solarSystemV3 .ss-label{position:absolute;color:#b9c8ce;font-size:10px;white-space:nowrap;text-align:center}.ss-label b{display:block;color:#fff;font-size:12px}#solarSystemV3 .ss-panel{position:absolute;left:18px;bottom:18px;padding:12px 14px;border:1px solid #4a3824;border-radius:10px;background:#02060ddd;color:#9eaeb5;font-size:11px;line-height:1.55}.ss-panel.right{left:auto;right:18px;text-align:right}#solarSystemV3 .ss-hint{position:absolute;right:24px;top:22px;color:#a8947b;font-size:11px;text-align:right}#solarSystemV3.playing .ss-sun{animation:ssPulse 2.8s ease-in-out infinite}#solarSystemV3.playing .ss-orbit{animation:ssOrbit 6s ease-in-out infinite}@keyframes ssPulse{50%{box-shadow:0 0 35px #ff9e22,0 0 90px #ff8c0066,0 0 145px #ff6b0038}}@keyframes ssOrbit{50%{opacity:.55;transform:translate(-50%,-50%) scale(1.012)}}@media(max-width:980px){#solarSystemV3{min-height:560px}#solarSystemV3 .ss-scene{transform:scale(.82);transform-origin:top center}}@media(max-width:620px){#solarSystemV3{min-height:470px}#solarSystemV3 .ss-scene{transform:scale(.58);transform-origin:50% 0}#solarSystemV3 .ss-panel,#solarSystemV3 .ss-hint{display:none}}@media(prefers-reduced-motion:reduce){#solarSystemV3 *{animation:none!important}}</style>'''
+          html = r'''<!-- solar-system-v3 --><button id="solarSystemLauncher" class="mode" data-target="solar" type="button" aria-expanded="false">☼ 太阳系 · Solar System</button><section id="solarSystemV3" aria-label="Solar System visualization"><div class="ss-title"><strong>☼ SOLAR SYSTEM</strong><small>太阳系 · Interactive Space Visualization</small></div><div class="ss-hint">点击场景播放 · CSS-only · 无外部资源<br>Eight planets · Asteroid Belt · Kuiper Belt</div><div class="ss-stars"></div><div class="ss-scene"><div class="ss-kuiper"></div><div class="ss-belt"></div><div class="ss-orbit o1"></div><div class="ss-orbit o2"></div><div class="ss-orbit o3"></div><div class="ss-orbit o4"></div><div class="ss-orbit o5"></div><div class="ss-orbit o6"></div><div class="ss-orbit o7"></div><div class="ss-orbit o8"></div><div class="ss-sun"></div><div class="ss-planet mercury"><span class="ss-label" style="left:-24px;top:-25px"><b>Mercury</b>水星</span></div><div class="ss-planet venus"><span class="ss-label" style="left:8px;top:-27px"><b>Venus</b>金星</span></div><div class="ss-planet earth"><span class="ss-label" style="left:12px;top:14px"><b>Earth</b>地球</span></div><div class="ss-planet mars"><span class="ss-label" style="left:-48px;top:8px"><b>Mars</b>火星</span></div><div class="ss-planet jupiter"><span class="ss-label" style="left:-26px;top:45px"><b>Jupiter</b>木星</span></div><div class="ss-planet saturn"><span class="ss-label" style="left:36px;top:10px"><b>Saturn</b>土星</span></div><div class="ss-planet uranus"><span class="ss-label" style="left:-90px;top:5px"><b>Uranus</b>天王星</span></div><div class="ss-planet neptune"><span class="ss-label" style="left:27px;top:7px"><b>Neptune</b>海王星</span></div></div><div class="ss-panel"><b>Relative Solar System</b><br>Sun · 8 Planets · Asteroid Belt · Kuiper Belt</div><div class="ss-panel right"><b>Orbital Period Guide</b><br>Mercury → Neptune<br>内侧快 · 外侧慢</div></section>'''
+          js = r'''<script id="solar-system-v3-js">(()=>{const launcher=document.getElementById('solarSystemLauncher'),panel=document.getElementById('solarSystemV3');if(!launcher||!panel)return;launcher.addEventListener('click',()=>{const show=!panel.classList.contains('show');panel.classList.toggle('show',show);launcher.classList.toggle('active',show);launcher.setAttribute('aria-expanded',String(show));if(show)panel.scrollIntoView({behavior:'smooth',block:'start'})});panel.addEventListener('click',e=>{if(e.target.closest('.ss-scene'))panel.classList.toggle('playing')})})();</script>'''
           s = s.replace('</style>', '</style>' + css, 1)
           s = s.replace('</main>', html + '</main>', 1)
           s = s.replace('</body>', js + '</body>', 1)
           p.write_text(s, encoding='utf-8')
-          print('solar system injected')
-
       - name: Commit generated page
         run: |
           git config user.name "github-actions[bot]"
