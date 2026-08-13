@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, stability-hardening, long-term-stable]
+    branches: [main, stability-hardening, long-term-stable, camouflage-web-v1]
   pull_request:
     branches: [main]
 
@@ -19,10 +19,12 @@ jobs:
       - name: Validate shell scripts
         run: |
           sh -n scripts/start.sh
-          python3 -m py_compile scripts/generate.py scripts/health_proxy.py scripts/backup_state.py scripts/rotate_subscription_token.py tests/test_generate.py
+          python3 -m py_compile scripts/generate.py scripts/health_proxy.py scripts/backup_state.py scripts/rotate_subscription_token.py tests/test_generate.py tests/test_site.py
 
-      - name: Run generation and state smoke tests
-        run: python3 tests/test_generate.py
+      - name: Run generation and site smoke tests
+        run: |
+          python3 tests/test_generate.py
+          python3 tests/test_site.py
 
       - name: Build production image
         run: docker build --pull --tag railway-v2-8080:ci .
