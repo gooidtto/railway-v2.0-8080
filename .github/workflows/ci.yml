@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, stability-hardening, long-term-stable]
+    branches: [main, stability-hardening, long-term-stable, camouflage-v2-stable]
   pull_request:
     branches: [main]
 
@@ -23,6 +23,9 @@ jobs:
 
       - name: Run generation and state smoke tests
         run: python3 tests/test_generate.py
+
+      - name: Run landing page smoke tests
+        run: python3 tests/test_site.py
 
       - name: Build production image
         run: docker build --pull --tag railway-v2-8080:ci .
