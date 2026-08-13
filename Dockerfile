@@ -33,6 +33,6 @@ ENV PORT=8080 \
     RELAY_IDLE_TIMEOUT=900 \
     READY_TIMEOUT=60
 EXPOSE 8080 10087
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 CMD python3 -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/health' % os.getenv('PORT','8080'), timeout=3).read()"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 CMD python3 -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/ready' % os.getenv('PORT','8080'), timeout=3).read()"
 WORKDIR /opt/xray
 ENTRYPOINT ["/opt/xray/scripts/start.sh"]
