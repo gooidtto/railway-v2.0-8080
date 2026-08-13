@@ -16,6 +16,19 @@ for required in (
     "网格模式",
     "粒子模式",
     "波浪模式",
+    "太阳系空间模式",
+    "Solar System",
+    "SUN",
+    "MERCURY",
+    "VENUS",
+    "EARTH",
+    "MARS",
+    "JUPITER",
+    "SATURN",
+    "URANUS",
+    "NEPTUNE",
+    "ASTEROID BELT",
+    "KUIPER BELT",
     "实时数据",
     "技术支持",
     "Three.js R160",
@@ -29,7 +42,9 @@ for required in (
     assert required in html, f"missing visual text: {required}"
 
 assert html.count('data-mode="') == 6
-assert html.count('data-target="') == 6
+assert html.count('data-target="') == 8
+assert 'data-target="solar"' in html
+assert 'id="solarPanel"' in html
 assert "requestAnimationFrame" not in html
 assert "setInterval" not in html
 assert "setTimeout" not in html
@@ -38,4 +53,4 @@ assert "https://" not in html and "http://" not in html
 size = len(html.encode("utf-8"))
 assert size < 100_000, f"landing page too large: {size} bytes"
 
-print(f"site smoke test: PASS ({size} bytes, 6 modes, no JS animation loop)")
+print(f"site smoke test: PASS ({size} bytes, 6 core modes + solar mode, no JS animation loop)")
