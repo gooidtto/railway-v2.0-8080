@@ -72,8 +72,8 @@ with tempfile.TemporaryDirectory() as tmp:
     assert token_file.read_text().strip() != "old-token"
     assert "/sub/" in (data / "subscription_url.txt").read_text()
 
-    restored = tmp / "restored"
-    restored_config = restored / "config.json"
+    restored = tmp / "restored-data"
+    restored_config = tmp / "restored-config.json"
     restored.mkdir()
     subprocess.run(
         ["python3", str(ROOT / "scripts" / "restore_state.py"), str(restored), str(backups[0]), str(restored_config)],
