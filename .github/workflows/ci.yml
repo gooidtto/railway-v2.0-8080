@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, stability-hardening]
+    branches: [main, stability-hardening, long-term-stable, camouflage-v2-stable]
   pull_request:
     branches: [main]
 
@@ -19,10 +19,53 @@ jobs:
       - name: Validate shell scripts
         run: |
           sh -n scripts/start.sh
-          python3 -m py_compile scripts/generate.py scripts/health_proxy.py tests/test_generate.py
+          python3 -m py_compile scripts/generate.py scripts/health_proxy.py scripts/backup_state.py scripts/rotate_subscription_token.py tests/test_generate.py
 
-      - name: Run generation smoke test
+      - name: Run generation and state smoke tests
         run: python3 tests/test_generate.py
+
+      - name: Run landing page smoke tests
+        run: python3 tests/test_site.py
 
       - name: Build production image
         run: docker build --pull --tag railway-v2-8080:ci .
+
+      - name: Run production container smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker volume create railway-v2-ci-data >/dev/null
+          docker run -d --name railway-v2-ci \
+            -e SERVER_HOST=tcp.example.test \
+            -e SERVER_PORT=443 \
+            -e PUBLIC_DOMAIN=edge.example.test \
+            -e DATA_DIR=/data \
+            -v railway-v2-ci-data:/data \
+            railway-v2-8080:ci
+
+          cleanup() {
+            docker logs railway-v2-ci || true
+            docker rm -f railway-v2-ci >/dev/null 2>&1 || true
+            docker volume rm railway-v2-ci-data >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          ready=false
+          for _ in {1..45}; do
+            if docker inspect -f '{{.State.Running}}' railway-v2-ci 2>/dev/null | grep -q true; then
+              if docker exec railway-v2-ci python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=2).read()" >/dev/null 2>&1; then
+                ready=true
+                break
+              fi
+            else
+              break
+            fi
+            sleep 1
+          done
+
+          test "$ready" = true
+          docker exec railway-v2-ci python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2).read()"
+          docker exec railway-v2-ci python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=2).read()"
+          docker exec railway-v2-ci test -s /data/subscription.txt
+          docker exec railway-v2-ci test -s /data/subscription_url.txt
+          docker exec railway-v2-ci sh -c "test -n \"\$(find /data/backups -name 'state-*.tar.gz' -print -quit)\""
