@@ -19,10 +19,12 @@ assert "Three.js R160" in html
 assert "WebGL 渲染" in html
 assert "three@0.160.0/build/three.module.min.js" in html
 assert "canvas" in low
+assert "drawAll" in html
+assert "bootFallback" in html
 
 urls = re.findall(r"https?://[^'\"\\s]+", html)
 assert len(urls) == 1, f"unexpected external URLs in landing page: {urls}"
-assert urls[0] == "https://unpkg.com/three@0.160.0/build/three.module.min.js"
+assert urls[0] == "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js"
 
 size = len(html.encode("utf-8"))
 assert size < 120_000, f"landing page is too large: {size} bytes"
