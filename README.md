@@ -1,6 +1,20 @@
-# railway-v1.0-8080
+# railway-v2.0-8080
 
-Railway + Xray XHTTP/REALITY deployment with a verified 7-SNI pool.
+Railway + Xray XHTTP/REALITY deployment with a verified 7-SNI pool and a persistence-first runtime design.
+
+## Stability baseline
+
+The production baseline is intentionally preserved:
+
+- 1 HTTPS + XHTTP node
+- 7 Railway TCP Proxy + XHTTP + REALITY nodes
+- UUID, REALITY keys, VLESS material, and subscription token persisted under `/data`
+- Xray configuration tested before launch
+- Railway readiness checks use `/ready`
+- Runtime configuration and subscription files are written atomically
+- Gateway connection count is bounded to prevent runaway thread growth
+
+Do not change transport, SNI, or Xray version together with operational hardening changes. Validate one class of change at a time.
 
 ## Architecture
 
@@ -8,7 +22,9 @@ Railway + Xray XHTTP/REALITY deployment with a verified 7-SNI pool.
 Public HTTPS :443
         |
 Railway gateway :8080
-        +-- /sub/* /health /ready /site -> HTTP handler
+        +-- /health -> gateway liveness
+        +-- /ready  -> Xray readiness
+        +-- /sub/*  -> authenticated subscription
         +-- /xhttp/* -> Xray XHTTP :10086
         `-- non-HTTP/TCP -> Xray REALITY + XHTTP :10087
 ```
@@ -16,6 +32,8 @@ Railway gateway :8080
 The subscription contains 8 nodes: 1 HTTPS + XHTTP node and 7 Railway TCP Proxy + XHTTP + REALITY nodes.
 
 ## Verified SNI pool
+
+Only verified SNI values belong in the production pool:
 
 - www.cloudflare.com
 - www.bing.com
@@ -25,36 +43,75 @@ The subscription contains 8 nodes: 1 HTTPS + XHTTP node and 7 Railway TCP Proxy 
 - www.gog.com
 - www.gamespot.com
 
-Only tested SNI values belong in the production pool.
+The pool count is validated at startup. A mismatch fails closed instead of generating a partial production configuration.
 
-## Layout
+## Persistent state
 
-```text
-config/reality-sni-candidates.txt
-scripts/generate.py
-scripts/health_proxy.py
-scripts/start.sh
-site/index.html
-Dockerfile
-railway.toml
-.gitignore
-.dockerignore
-```
-
-## Deployment
-
-Railway should provide public HTTP port 8080, a TCP Proxy for REALITY nodes, and preferably a persistent volume mounted at /data.
-
-The public domain is controlled by PUBLIC_DOMAIN. Runtime UUID, REALITY keys, VLESS material and subscription token are stored under /data.
-
-Subscription endpoint:
+When a Railway Volume is mounted at `/data`, the following identity material survives container restarts:
 
 ```text
-https://<public-domain>/sub/<subscription-token>
+/data/uuid.txt
+/data/reality_private_key.txt
+/data/reality_public_key.txt
+/data/vless_decryption.txt
+/data/vless_encryption.txt
+/data/subscription_token.txt
+/data/subscription_url.txt
+/data/subscription.txt
 ```
 
-Health endpoints: `/health` and `/ready`.
+Do not delete or replace these files during normal maintenance unless intentionally rotating the deployment identity.
 
-## Stability baseline
+## Required Railway settings
 
-The current production baseline is the verified HTTPS/XHTTP node plus the 7 verified REALITY SNI nodes. Preserve this baseline when testing future transport or SNI changes.
+The runtime expects a public HTTP service on port `8080` and a TCP Proxy for the REALITY nodes. Railway-provided values are used automatically when available:
+
+- `RAILWAY_PUBLIC_DOMAIN`
+- `RAILWAY_TCP_PROXY_DOMAIN`
+- `RAILWAY_TCP_PROXY_PORT`
+
+You can override them with:
+
+- `PUBLIC_DOMAIN`
+- `SERVER_HOST`
+- `SERVER_PORT`
+
+A persistent Volume mounted at `/data` is strongly recommended for long-term stability.
+
+## Health and readiness
+
+- `/health` confirms the gateway process is accepting HTTP requests.
+- `/ready` returns `200` only after both Xray listeners (`10087` and `10086`) are reachable and the persistent subscription URL has been generated.
+- Railway uses `/ready` as its deployment healthcheck.
+
+The startup supervisor exits the container if either Xray or the gateway process dies, allowing Railway's restart policy to recover the service.
+
+## Configuration safety
+
+Runtime configuration is generated into temporary files and atomically renamed into place. This prevents a restart from leaving a truncated `config.json` or subscription file.
+
+The gateway also has configurable limits:
+
+```text
+GATEWAY_BACKLOG=512
+GATEWAY_MAX_CONNECTIONS=512
+RELAY_IDLE_TIMEOUT=900
+READY_TIMEOUT=60
+```
+
+These defaults are conservative and can be overridden through Railway environment variables.
+
+## CI
+
+Every push to `main` or `stability-hardening`, and every pull request to `main`, runs:
+
+1. Shell syntax validation
+2. Python compilation
+3. Deterministic configuration-generation smoke test
+4. Production Docker image build
+
+The CI test intentionally uses synthetic credentials and a temporary directory. No production secrets are stored in the repository.
+
+## Deployment rule
+
+Treat the currently working production configuration as the baseline. Operational hardening should not silently alter the verified transport or SNI set. Changes that affect transport, Xray version, or the SNI pool should be validated separately before promotion.
