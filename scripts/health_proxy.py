@@ -8,14 +8,38 @@ PORT = int(os.getenv("PORT", "8080"))
 REALITY = ("127.0.0.1", int(os.getenv("XRAY_PORT", "10087")))
 XHTTP = ("127.0.0.1", int(os.getenv("XRAY_HTTP_PORT", "10086")))
 SITE = Path(os.getenv("SITE_DIR", "/opt/xray/site"))
-SUB = Path(os.getenv("SUBSCRIPTION_FILE", "/data/subscription.txt"))
-TOKEN = Path(os.getenv("SUBSCRIPTION_TOKEN_FILE", "/data/subscription_token.txt"))
-READY = Path(os.getenv("XRAY_READY_FILE", "/data/.xray-ready"))
+DATA = Path(os.getenv("DATA_DIR", "/data"))
+SUB = Path(os.getenv("SUBSCRIPTION_FILE", str(DATA / "subscription.txt")))
+TOKEN = Path(os.getenv("SUBSCRIPTION_TOKEN_FILE", str(DATA / "subscription_token.txt")))
+READY = Path(os.getenv("XRAY_READY_FILE", str(DATA / ".xray-ready")))
+XRAY_PID = Path(os.getenv("XRAY_PID_FILE", str(DATA / "xray.pid")))
+GATEWAY_PID = Path(os.getenv("GATEWAY_PID_FILE", str(DATA / "gateway.pid")))
 BACKLOG = int(os.getenv("GATEWAY_BACKLOG", "512"))
 MAX_CONNECTIONS = int(os.getenv("GATEWAY_MAX_CONNECTIONS", "512"))
 RELAY_IDLE_TIMEOUT = int(os.getenv("RELAY_IDLE_TIMEOUT", "900"))
 
 CONNECTIONS = threading.BoundedSemaphore(MAX_CONNECTIONS)
+
+
+def pid_alive(path):
+    try:
+        pid = int(path.read_text().strip())
+        os.kill(pid, 0)
+        return True
+    except (OSError, ValueError, FileNotFoundError):
+        return False
+
+
+def backend_ready(endpoint):
+    try:
+        with socket.create_connection(endpoint, 1):
+            return True
+    except OSError:
+        return False
+
+
+def runtime_ready():
+    return all((READY.exists(), pid_alive(XRAY_PID), pid_alive(GATEWAY_PID), backend_ready(REALITY), backend_ready(XHTTP), SUB.is_file(), SUB.stat().st_size > 0 if SUB.exists() else False, TOKEN.is_file(), TOKEN.stat().st_size > 0 if TOKEN.exists() else False))
 
 
 def relay(a, b, first=b""):
@@ -82,7 +106,7 @@ def handle(c):
                 c.sendall(reply(200, "text/plain", "OK\n"))
                 return
             if path == "/ready":
-                c.sendall(reply(200 if READY.exists() else 503, "text/plain", "READY\n" if READY.exists() else "NOT READY\n"))
+                c.sendall(reply(200 if runtime_ready() else 503, "text/plain", "READY\n" if runtime_ready() else "NOT READY\n"))
                 return
             if path == "/":
                 index = SITE / "index.html"

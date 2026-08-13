@@ -2,17 +2,19 @@
 
 Railway + Xray XHTTP/REALITY deployment with a verified 7-SNI pool and a persistence-first runtime design.
 
-## Stability baseline
+## Long-term stability baseline
 
-The production baseline is intentionally preserved:
+The production transport baseline is intentionally preserved:
 
 - 1 HTTPS + XHTTP node
 - 7 Railway TCP Proxy + XHTTP + REALITY nodes
 - UUID, REALITY keys, VLESS material, and subscription token persisted under `/data`
 - Xray configuration tested before launch
-- Railway readiness checks use `/ready`
+- `/ready` reflects live gateway, Xray, listener, and subscription state
 - Runtime configuration and subscription files are written atomically
 - Gateway connection count is bounded to prevent runaway thread growth
+- Runtime state is snapshotted after successful startup; only the newest 5 snapshots are retained
+- Subscription token rotation is manual, never automatic
 
 Do not change transport, SNI, or Xray version together with operational hardening changes. Validate one class of change at a time.
 
@@ -23,7 +25,7 @@ Public HTTPS :443
         |
 Railway gateway :8080
         +-- /health -> gateway liveness
-        +-- /ready  -> Xray readiness
+        +-- /ready  -> live runtime readiness
         +-- /sub/*  -> authenticated subscription
         +-- /xhttp/* -> Xray XHTTP :10086
         `-- non-HTTP/TCP -> Xray REALITY + XHTTP :10087
@@ -45,9 +47,9 @@ Only verified SNI values belong in the production pool:
 
 The pool count is validated at startup. A mismatch fails closed instead of generating a partial production configuration.
 
-## Persistent state
+## Persistent state and recovery
 
-When a Railway Volume is mounted at `/data`, the following identity material survives container restarts:
+When a Railway Volume is mounted at `/data`, identity material survives container restarts:
 
 ```text
 /data/uuid.txt
@@ -58,9 +60,23 @@ When a Railway Volume is mounted at `/data`, the following identity material sur
 /data/subscription_token.txt
 /data/subscription_url.txt
 /data/subscription.txt
+/data/vless.txt
+/data/reality-sni-list.txt
 ```
 
-Do not delete or replace these files during normal maintenance unless intentionally rotating the deployment identity.
+After a successful startup, `scripts/backup_state.py` creates a restricted `tar.gz` snapshot under `/data/backups/`. The snapshot contains identity material and runtime configuration, so it is sensitive. Keep an external/offline copy if the deployment identity must survive loss of the Railway Volume. The runtime retains only the newest five snapshots.
+
+Do not delete or replace identity files during normal maintenance unless intentionally rotating the deployment identity.
+
+## Subscription token rotation
+
+The subscription token is intentionally stable across normal restarts. If the URL is exposed, rotate it manually:
+
+```text
+python3 /opt/xray/scripts/rotate_subscription_token.py /data
+```
+
+Rotation invalidates the previous token immediately. Existing clients using the old URL must be updated with the new subscription URL. Never automate token rotation as part of normal startup.
 
 ## Required Railway settings
 
@@ -76,19 +92,21 @@ You can override them with:
 - `SERVER_HOST`
 - `SERVER_PORT`
 
+There is no hard-coded production-domain fallback. A missing public domain or TCP proxy configuration fails closed during startup.
+
 A persistent Volume mounted at `/data` is strongly recommended for long-term stability.
 
 ## Health and readiness
 
 - `/health` confirms the gateway process is accepting HTTP requests.
-- `/ready` returns `200` only after both Xray listeners (`10087` and `10086`) are reachable and the persistent subscription URL has been generated.
+- `/ready` returns `200` only when the readiness marker exists, both supervised processes are alive, both Xray listeners are reachable, and subscription/token state is present.
 - Railway uses `/ready` as its deployment healthcheck.
 
 The startup supervisor exits the container if either Xray or the gateway process dies, allowing Railway's restart policy to recover the service.
 
 ## Configuration safety
 
-Runtime configuration is generated into temporary files and atomically renamed into place. This prevents a restart from leaving a truncated `config.json` or subscription file.
+Runtime configuration is generated into temporary files and atomically renamed into place. Identity files are also written atomically. This prevents a restart or interrupted write from leaving truncated credentials, `config.json`, or subscription files.
 
 The gateway also has configurable limits:
 
@@ -103,14 +121,17 @@ These defaults are conservative and can be overridden through Railway environmen
 
 ## CI
 
-Every push to `main` or `stability-hardening`, and every pull request to `main`, runs:
+Every push to `main`, `stability-hardening`, or `long-term-stable`, and every pull request to `main`, runs:
 
 1. Shell syntax validation
 2. Python compilation
 3. Deterministic configuration-generation smoke test
 4. Production Docker image build
+5. Production container runtime smoke test
+6. `/health` and `/ready` checks
+7. Subscription and runtime backup existence checks
 
-The CI test intentionally uses synthetic credentials and a temporary directory. No production secrets are stored in the repository.
+The CI runtime test uses synthetic credentials and a temporary volume. No production secrets are stored in the repository.
 
 ## Deployment rule
 
