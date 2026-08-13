@@ -8,10 +8,12 @@ if len(sys.argv) != 2:
     raise SystemExit("usage: rotate_subscription_token.py DATA_DIR")
 
 root = Path(sys.argv[1]).resolve()
+root.mkdir(mode=0o700, parents=True, exist_ok=True)
 token_file = root / "subscription_token.txt"
 url_file = root / "subscription_url.txt"
 old = token_file.read_text().strip() if token_file.exists() else ""
 new = secrets.token_urlsafe(32)
+
 tmp = root / ".subscription_token.rotate.tmp"
 tmp.write_text(new + "\n")
 os.chmod(tmp, 0o600)
@@ -26,4 +28,4 @@ if public_domain:
 
 print("subscription token rotated")
 print("previous token invalidated:", bool(old))
-print("new subscription URL:", url_file.read_text().strip() if url_file.exists() else "set PUBLIC_DOMAIN and read subscription_url.txt")
+print("new subscription URL stored in subscription_url.txt")
