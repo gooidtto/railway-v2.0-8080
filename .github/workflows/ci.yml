@@ -38,7 +38,6 @@ jobs:
             -e PUBLIC_DOMAIN=edge.example.test \
             -e DATA_DIR=/data \
             -v "$RUNNER_TEMP/railway-data:/data" \
-            -p 18080:8080 \
             railway-v2-8080:ci
 
           cleanup() {
@@ -48,14 +47,16 @@ jobs:
           trap cleanup EXIT
 
           for _ in {1..45}; do
-            if curl -fsS http://127.0.0.1:18080/ready >/dev/null; then
-              break
+            if docker inspect -f '{{.State.Running}}' railway-v2-ci 2>/dev/null | grep -q true; then
+              if docker exec railway-v2-ci python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=2).read()"; then
+                break
+              fi
             fi
             sleep 1
           done
 
-          curl -fsS http://127.0.0.1:18080/health >/dev/null
-          curl -fsS http://127.0.0.1:18080/ready >/dev/null
+          docker exec railway-v2-ci python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2).read()"
+          docker exec railway-v2-ci python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=2).read()"
           test -s "$RUNNER_TEMP/railway-data/subscription.txt"
           test -s "$RUNNER_TEMP/railway-data/subscription_url.txt"
           test -n "$(find "$RUNNER_TEMP/railway-data/backups" -name 'state-*.tar.gz' -print -quit)"
