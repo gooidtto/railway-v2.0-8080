@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, stability-hardening]
+    branches: [main, stability-hardening, long-term-stable]
   pull_request:
     branches: [main]
 
@@ -19,10 +19,43 @@ jobs:
       - name: Validate shell scripts
         run: |
           sh -n scripts/start.sh
-          python3 -m py_compile scripts/generate.py scripts/health_proxy.py tests/test_generate.py
+          python3 -m py_compile scripts/generate.py scripts/health_proxy.py scripts/backup_state.py scripts/rotate_subscription_token.py tests/test_generate.py
 
       - name: Run generation smoke test
         run: python3 tests/test_generate.py
 
       - name: Build production image
         run: docker build --pull --tag railway-v2-8080:ci .
+
+      - name: Run production container smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/railway-data"
+          docker run -d --name railway-v2-ci \
+            -e SERVER_HOST=tcp.example.test \
+            -e SERVER_PORT=443 \
+            -e PUBLIC_DOMAIN=edge.example.test \
+            -e DATA_DIR=/data \
+            -v "$RUNNER_TEMP/railway-data:/data" \
+            -p 18080:8080 \
+            railway-v2-8080:ci
+
+          cleanup() {
+            docker logs railway-v2-ci || true
+            docker rm -f railway-v2-ci >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          for _ in {1..45}; do
+            if curl -fsS http://127.0.0.1:18080/ready >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl -fsS http://127.0.0.1:18080/health >/dev/null
+          curl -fsS http://127.0.0.1:18080/ready >/dev/null
+          test -s "$RUNNER_TEMP/railway-data/subscription.txt"
+          test -s "$RUNNER_TEMP/railway-data/subscription_url.txt"
+          test -n "$(find "$RUNNER_TEMP/railway-data/backups" -name 'state-*.tar.gz' -print -quit)"
