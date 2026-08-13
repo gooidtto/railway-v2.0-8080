@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main, stability-hardening]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate shell scripts
+        run: |
+          sh -n scripts/start.sh
+          python3 -m py_compile scripts/generate.py scripts/health_proxy.py tests/test_generate.py
+
+      - name: Run generation smoke test
+        run: python3 tests/test_generate.py
+
+      - name: Build production image
+        run: docker build --pull --tag railway-v2-8080:ci .
