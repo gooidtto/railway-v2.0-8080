@@ -12,7 +12,7 @@ COPY site/ /opt/xray/site/
 RUN chmod 0755 /usr/local/bin/xray /opt/xray/scripts/*.sh /opt/xray/scripts/*.py && chmod 0644 /opt/xray/config/reality-sni-candidates.txt /opt/xray/site/*
 ENV PORT=8080 \
     GATEWAY_PORT=8080 \
-    XRAY_PORT=10087 \
+    XRAY_PORT=10085 \
     XRAY_HTTP_PORT=10086 \
     XRAY_LISTEN=127.0.0.1 \
     XRAY_LOGLEVEL=info \
@@ -30,9 +30,10 @@ ENV PORT=8080 \
     SUBSCRIPTION_TOKEN_FILE=/data/subscription_token.txt \
     GATEWAY_BACKLOG=512 \
     GATEWAY_MAX_CONNECTIONS=512 \
-    RELAY_IDLE_TIMEOUT=900 \
+    RELAY_IDLE_TIMEOUT=300 \
+    TCP_PROXY_PROTOCOL=auto \
     READY_TIMEOUT=60
-EXPOSE 8080 10087
+EXPOSE 8080 10085
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 CMD python3 -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/ready' % os.getenv('PORT','8080'), timeout=3).read()"
 WORKDIR /opt/xray
 ENTRYPOINT ["/opt/xray/scripts/start.sh"]
