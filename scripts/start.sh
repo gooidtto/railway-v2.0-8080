@@ -58,7 +58,7 @@ else
 fi
 
 export PORT="$G" GATEWAY_PORT="$G" DATA_DIR="$D" XRAY_CONFIG="$C" UUID PRIVATE_KEY PUBLIC_KEY VLESS_DECRYPTION VLESS_ENCRYPTION
-export XRAY_PORT="${XRAY_PORT:-10087}" XRAY_HTTP_PORT="${XRAY_HTTP_PORT:-10086}" XRAY_LISTEN=127.0.0.1
+export XRAY_PORT="${XRAY_PORT:-10085}" XRAY_HTTP_PORT="${XRAY_HTTP_PORT:-10086}" XRAY_LISTEN=127.0.0.1
 export REALITY_TARGET="${REALITY_TARGET:-www.cloudflare.com:443}" REALITY_FINGERPRINT="${REALITY_FINGERPRINT:-chrome}"
 export XHTTP_PATH="${XHTTP_PATH:-/xhttp}" XHTTP_MODE="${XHTTP_MODE:-auto}" SHORT_ID="${SHORT_ID:-50175c035ee132}"
 export REALITY_SNI_LIMIT="${REALITY_SNI_LIMIT:-7}" REALITY_SNI_CANDIDATES_FILE="${REALITY_SNI_CANDIDATES_FILE:-/opt/xray/config/reality-sni-candidates.txt}"
@@ -77,7 +77,7 @@ trap 'rm -f "$D/.xray-ready"; kill "$XP" "$HP" 2>/dev/null || true; wait "$XP" 2
 READY_TIMEOUT="${READY_TIMEOUT:-60}"
 i=0
 while :; do
-  if python3 -c 'import socket; s=socket.create_connection(("127.0.0.1",10087),1); s.close()' 2>/dev/null && \
+  if python3 -c 'import socket; s=socket.create_connection(("127.0.0.1",10085),1); s.close()' 2>/dev/null && \
      python3 -c 'import socket; s=socket.create_connection(("127.0.0.1",10086),1); s.close()' 2>/dev/null; then
     break
   fi
