@@ -16,7 +16,7 @@ def env(name, default=None, required=False):
 def write_atomic(path, data, mode=0o600):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.tmp")
-    tmp.write_text(data)
+    tmp.write_text(data, encoding="utf-8")
     os.chmod(tmp, mode)
     os.replace(tmp, path)
 
@@ -31,106 +31,166 @@ def hostname(value, name):
     return value
 
 
-def target(value):
-    value = (value or "").strip()
-    if value.startswith(("http://", "https://")):
-        value = urlparse(value).netloc or urlparse(value).path
-    value = value.strip("[]").rstrip("/")
-    if ":" not in value:
-        value += ":443"
-    host, port = value.rsplit(":", 1)
-    if not re.fullmatch(r"[A-Za-z0-9.-]+", host) or not port.isdigit() or not 1 <= int(port) <= 65535:
-        raise SystemExit("ERROR: invalid REALITY_TARGET")
-    return f"{host}:{int(port)}"
+def port(value, name):
+    try:
+        number = int(str(value).strip())
+    except ValueError:
+        raise SystemExit(f"ERROR: invalid {name}") from None
+    if not 1 <= number <= 65535:
+        raise SystemExit(f"ERROR: invalid {name}")
+    return number
 
 
-D = Path(env("DATA_DIR", "/data"))
-C = Path(env("XRAY_CONFIG", "/etc/xray/config.json"))
-uuid = env("UUID", required=True)
-private_key = env("PRIVATE_KEY", required=True)
-public_key = env("PUBLIC_KEY", required=True)
-vless_decryption = env("VLESS_DECRYPTION", required=True)
-vless_encryption = env("VLESS_ENCRYPTION", required=True)
+DATA = Path(env("DATA_DIR", "/data"))
+CONFIG = Path(env("XRAY_CONFIG", "/etc/xray/config.json"))
+UUID = env("UUID", required=True)
+PRIVATE_KEY = env("PRIVATE_KEY", required=True)
+PUBLIC_KEY = env("PUBLIC_KEY", required=True)
+VLESS_DECRYPTION = env("VLESS_DECRYPTION", required=True)
 
-reality_target = target(env("REALITY_TARGET", "www.cloudflare.com:443"))
-fingerprint = env("REALITY_FINGERPRINT", "chrome").strip()
-xhttp_path = env("XHTTP_PATH", "/xhttp").strip()
-xhttp_mode = env("XHTTP_MODE", "auto").strip()
-short_id = env("SHORT_ID", "50175c035ee132").strip()
-domain = hostname(env("PUBLIC_DOMAIN", required=True), "PUBLIC_DOMAIN")
-server_host = hostname(env("SERVER_HOST", required=True), "SERVER_HOST")
-server_port = env("SERVER_PORT", required=True).strip()
+PUBLIC_DOMAIN = hostname(env("PUBLIC_DOMAIN", required=True), "PUBLIC_DOMAIN")
+TCP1_HOST = hostname(env("TCP1_HOST", required=True), "TCP1_HOST")
+TCP1_PORT = port(env("TCP1_PORT", required=True), "TCP1_PORT")
+TCP2_HOST = hostname(env("TCP2_HOST", required=True), "TCP2_HOST")
+TCP2_PORT = port(env("TCP2_PORT", required=True), "TCP2_PORT")
+TCP3_HOST = hostname(env("TCP3_HOST", required=True), "TCP3_HOST")
+TCP3_PORT = port(env("TCP3_PORT", required=True), "TCP3_PORT")
 
-if not 1 <= int(server_port) <= 65535:
-    raise SystemExit("ERROR: invalid SERVER_PORT")
-if not xhttp_path.startswith("/"):
+XHTTP_PATH = env("XHTTP_PATH", "/xhttp").strip()
+XHTTP_MODE = env("XHTTP_MODE", "auto").strip()
+FINGERPRINT = env("REALITY_FINGERPRINT", "chrome").strip()
+REALITY_TARGET = env("REALITY_TARGET", "www.cloudflare.com:443").strip()
+REALITY_SNI = hostname(env("REALITY_SNI", "www.cloudflare.com"), "REALITY_SNI")
+SHORT_ID = env("SHORT_ID", required=True).strip()
+GRPC_SERVICE = env("GRPC_SERVICE_NAME", "grpc-service").strip()
+WS_PATH = env("WS_PATH", "/ws").strip()
+
+if not XHTTP_PATH.startswith("/"):
     raise SystemExit("ERROR: XHTTP_PATH must start with /")
-if xhttp_mode not in {"auto", "packet-up", "stream-up"}:
+if XHTTP_MODE not in {"auto", "packet-up", "stream-up"}:
     raise SystemExit("ERROR: invalid XHTTP_MODE")
-if not re.fullmatch(r"[0-9a-fA-F]{8,32}", short_id):
+if not WS_PATH.startswith("/"):
+    raise SystemExit("ERROR: WS_PATH must start with /")
+if not GRPC_SERVICE:
+    raise SystemExit("ERROR: GRPC_SERVICE_NAME is required")
+if not re.fullmatch(r"[0-9a-fA-F]{8,32}", SHORT_ID):
     raise SystemExit("ERROR: SHORT_ID must be 8-32 hexadecimal characters")
-if not fingerprint:
-    raise SystemExit("ERROR: REALITY_FINGERPRINT is required")
 
-sni_file = Path(env("REALITY_SNI_CANDIDATES_FILE", "/opt/xray/config/reality-sni-candidates.txt"))
-limit = int(env("REALITY_SNI_LIMIT", "7"))
-pool = list(dict.fromkeys(x.strip() for x in sni_file.read_text().splitlines() if x.strip() and not x.startswith("#")))
-if len(pool) != limit:
-    raise SystemExit("ERROR: verified SNI pool count mismatch")
-for sni in pool:
-    hostname(sni, "REALITY SNI")
+# Fixed internal ports; Railway maps its public endpoints to these ports.
+XHTTP_PORT = 10086
+VISION_PORT = 10087
+GRPC_PORT = 10088
+WS_PORT = 10089
 
-base = {
-    "listen": "127.0.0.1",
-    "port": int(env("XRAY_PORT", "10087")),
-    "protocol": "vless",
-    "settings": {"clients": [{"id": uuid}], "decryption": vless_decryption},
-    "streamSettings": {
-        "network": "xhttp",
-        "security": "reality",
-        "realitySettings": {
-            "show": False,
-            "target": reality_target,
-            "xver": 0,
-            "serverNames": pool,
-            "privateKey": private_key,
-            "shortIds": [short_id],
+REALITY = {
+    "show": False,
+    "target": REALITY_TARGET,
+    "xver": 0,
+    "serverNames": [REALITY_SNI],
+    "privateKey": PRIVATE_KEY,
+    "shortIds": [SHORT_ID],
+}
+
+inbounds = [
+    {
+        "listen": "127.0.0.1",
+        "port": XHTTP_PORT,
+        "protocol": "vless",
+        "settings": {
+            "clients": [{"id": UUID}],
+            "decryption": VLESS_DECRYPTION,
         },
-        "xhttpSettings": {"path": xhttp_path, "mode": xhttp_mode},
+        "streamSettings": {
+            "network": "xhttp",
+            "security": "none",
+            "xhttpSettings": {"path": XHTTP_PATH, "mode": XHTTP_MODE},
+        },
     },
-}
-plain = {
-    "listen": "127.0.0.1",
-    "port": int(env("XRAY_HTTP_PORT", "10086")),
-    "protocol": "vless",
-    "settings": {"clients": [{"id": uuid}], "decryption": vless_decryption},
-    "streamSettings": {
-        "network": "xhttp",
-        "security": "none",
-        "xhttpSettings": {"path": xhttp_path, "mode": xhttp_mode},
+    {
+        "listen": "0.0.0.0",
+        "port": VISION_PORT,
+        "protocol": "vless",
+        "settings": {
+            "clients": [{"id": UUID, "flow": "xtls-rprx-vision"}],
+            "decryption": VLESS_DECRYPTION,
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "security": "reality",
+            "realitySettings": REALITY,
+        },
     },
-}
+    {
+        "listen": "0.0.0.0",
+        "port": GRPC_PORT,
+        "protocol": "vless",
+        "settings": {
+            "clients": [{"id": UUID}],
+            "decryption": VLESS_DECRYPTION,
+        },
+        "streamSettings": {
+            "network": "grpc",
+            "security": "reality",
+            "realitySettings": REALITY,
+            "grpcSettings": {"serviceName": GRPC_SERVICE},
+        },
+    },
+    {
+        "listen": "0.0.0.0",
+        "port": WS_PORT,
+        "protocol": "vless",
+        "settings": {
+            "clients": [{"id": UUID}],
+            "decryption": VLESS_DECRYPTION,
+        },
+        "streamSettings": {
+            "network": "ws",
+            "security": "tls",
+            "tlsSettings": {
+                "certificates": [
+                    {
+                        "certificateFile": "/data/ws/fullchain.pem",
+                        "keyFile": "/data/ws/privkey.pem",
+                    }
+                ]
+            },
+            "wsSettings": {"path": WS_PATH},
+        },
+    },
+]
 
-config = {
-    "log": {"loglevel": env("XRAY_LOGLEVEL", "info")},
-    "inbounds": [base, plain],
-    "outbounds": [{"protocol": "freedom", "tag": "direct"}],
-}
-write_atomic(C, json.dumps(config, indent=2) + "\n")
+CONFIG.parent.mkdir(parents=True, exist_ok=True)
+write_atomic(
+    CONFIG,
+    json.dumps(
+        {
+            "log": {"loglevel": env("XRAY_LOGLEVEL", "warning")},
+            "inbounds": inbounds,
+            "outbounds": [{"protocol": "freedom", "tag": "direct"}],
+        },
+        indent=2,
+    )
+    + "\n",
+)
 
 nodes = [
-    f"vless://{uuid}@{domain}:443/?encryption={quote(vless_encryption, safe='')}&security=tls&type=xhttp&fp={quote(fingerprint, safe='')}&sni={quote(domain, safe='')}&alpn=h2%2Chttp%2F1.1&path={quote(xhttp_path, safe='')}&mode={quote(xhttp_mode, safe='')}#railway-xhttp-https-{domain}"
+    f"vless://{UUID}@{PUBLIC_DOMAIN}:443?encryption=none&security=tls&sni={quote(PUBLIC_DOMAIN, safe='')}&fp={quote(FINGERPRINT, safe='')}&alpn=h2%2Chttp%2F1.1&type=xhttp&path={quote(XHTTP_PATH, safe='')}&mode={quote(XHTTP_MODE, safe='')}#VLESS%20XHTTP%20TLS",
+    f"vless://{UUID}@{TCP1_HOST}:{TCP1_PORT}?encryption=none&flow=xtls-rprx-vision&security=reality&sni={quote(REALITY_SNI, safe='')}&fp={quote(FINGERPRINT, safe='')}&pbk={quote(PUBLIC_KEY, safe='')}&sid={SHORT_ID}&type=tcp#VLESS%20RAW%20REALITY%20Vision",
+    f"vless://{UUID}@{TCP2_HOST}:{TCP2_PORT}?encryption=none&security=reality&sni={quote(REALITY_SNI, safe='')}&fp={quote(FINGERPRINT, safe='')}&pbk={quote(PUBLIC_KEY, safe='')}&sid={SHORT_ID}&type=grpc&serviceName={quote(GRPC_SERVICE, safe='')}#VLESS%20gRPC%20REALITY",
+    f"vless://{UUID}@{TCP3_HOST}:{TCP3_PORT}?encryption=none&security=tls&sni={quote(PUBLIC_DOMAIN, safe='')}&fp={quote(FINGERPRINT, safe='')}&type=ws&path={quote(WS_PATH, safe='')}#VLESS%20WS%20TLS",
 ]
-for sni in pool:
-    nodes.append(
-        f"vless://{uuid}@{server_host}:{int(server_port)}/?encryption={quote(vless_encryption, safe='')}&security=reality&type=xhttp&fp={quote(fingerprint, safe='')}&sni={quote(sni, safe='')}&pbk={quote(public_key, safe='')}&sid={short_id}&path={quote(xhttp_path, safe='')}&mode={quote(xhttp_mode, safe='')}#railway-xhttp-reality-{sni}"
-    )
+
+if len(nodes) != 4:
+    raise SystemExit(f"ERROR: NODE_COUNT invariant violated: {len(nodes)}")
 
 text = "\n".join(nodes) + "\n"
-D.mkdir(parents=True, exist_ok=True)
-write_atomic(D / "vless.txt", text)
-write_atomic(D / "subscription.txt", base64.b64encode(text.encode()).decode() + "\n")
-write_atomic(D / "reality-sni-list.txt", "\n".join(pool) + "\n")
+write_atomic(DATA / "vless.txt", text)
+write_atomic(DATA / "subscription.txt", base64.b64encode(text.encode()).decode() + "\n")
+write_atomic(DATA / "node_count.txt", "4\n")
 
-print(f"HTTPS XHTTP node generated: {domain}:443")
-print(f"REALITY SNI nodes generated: {len(pool)}")
+print("BUILD=railway-v2-fixed-4-node")
+print("NODE_COUNT=4")
+print(f"01 DOMAIN:443 -> {XHTTP_PORT} XHTTP TLS")
+print(f"02 {TCP1_HOST}:{TCP1_PORT} -> {VISION_PORT} RAW REALITY Vision")
+print(f"03 {TCP2_HOST}:{TCP2_PORT} -> {GRPC_PORT} gRPC REALITY")
+print(f"04 {TCP3_HOST}:{TCP3_PORT} -> {WS_PORT} WS TLS")
